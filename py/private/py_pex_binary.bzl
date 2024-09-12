@@ -38,19 +38,26 @@ def _map_srcs(f, workspace):
 
     site_packages_i = f.path.find("site-packages")
     
-    # if path contains `site-packages` and there is only two path segments
-    # after it, it will be treated as third party dep.
+    # The path will be treated as a third-party dep if it ends with '__init__.py' and has one "/"
+    # after first 'site-packages' 'substring'
+    #
     # Here are some examples of path we expect and use and ones we ignore.
+    #
+    # Match: `external/rules_python~~pip~pypi_39_rtoml/site-packages/__init__.py`
+    # Reason: It has one `/` after first `site-packages` substring and ends with '__init__.py'
     #  
-    # Match: `external/rules_python~~pip~pypi_39_rtoml/site-packages/rtoml-0.11.0.dist-info/INSTALLER`
-    # Reason: It has two `/` after first `site-packages` substring.
-    # 
     # No Match: `external/rules_python~~pip~pypi_39_rtoml/site-packages/rtoml-0.11.0/src/mod/parse.py`
-    # Reason: It has three `/` after first `site-packages` substring.
-    if site_packages_i != -1 and f.path.count("/", site_packages_i) == 2:
-        if f.path.find("dist-info", site_packages_i) != -1:
+    # Reason: the path does not end with __init__.py nor is one "/" after first 'site-packages'-substring
+    if site_packages_i != -1:
+        if (f.path.count("/", site_packages_i) == 2 and
+                f.path.find("dist-info", site_packages_i) != -1):
             return ["--distinfo={}".format(f.dirname)]
-        return ["--dep={}".format(f.dirname)]
+
+        # all site-packages should have an init in their sub-directory
+        elif (f.path.count("/", site_packages_i) == 1 and
+              f.basename == "__init__.py"):
+            return ["--dep={}".format(f.dirname)]
+
 
     # If the path does not have a `site-packages` in it, then put it into 
     # the standard runfiles tree.
